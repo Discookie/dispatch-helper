@@ -855,7 +855,9 @@ export function updateTimetable(stationID, forceUpdate = true) {
         trainType.appendChild(trainMaxSpeed);
 
         const trainComposition = document.createElement('small');
-        trainComposition.innerText = train.composition;
+        const composition = train.composition.length <= 14 ? train.composition: 
+            train.composition.slice(0, 4) + '..' + train.composition.length + '..' + train.composition.slice(-4);
+        trainComposition.innerText = composition;
         trainType.appendChild(trainComposition);
 
         row.appendChild(trainType);
