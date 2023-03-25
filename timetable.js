@@ -904,7 +904,14 @@ export function updateTimetable(stationID, forceUpdate = true) {
         const previousStopUuid = train.stops[previousStopIdx]?.stationID;
         const previousStopName = levelContent['stations']['stations'].find(e => e.uuid === previousStopUuid)?.name;
         const previousStop = document.createElement('span');
-        previousStop.innerText = previousStopName ?? '(incoming)';
+        if (previousStopName) {
+            previousStop.innerText = previousStopName + ' ';
+            const previousStopPlatform = document.createElement('small');
+            previousStopPlatform.innerText = `#${train.stops[previousStopIdx].platform}`;
+            previousStop.appendChild(previousStopPlatform);
+        } else {
+            previousStop.innerText = '(incoming)';
+        }
         from.appendChild(previousStop);
 
         if (previousStopIdx >= 1) {
@@ -979,7 +986,14 @@ export function updateTimetable(stationID, forceUpdate = true) {
         const nextStopUuid = train.stops[nextStopIdx]?.stationID;
         const nextStopName = levelContent['stations']['stations'].find(e => e.uuid === nextStopUuid)?.name;
         const nextStop = document.createElement('span');
-        nextStop.innerText = nextStopName ?? '(outgoing)';
+        if (nextStopName) {
+            nextStop.innerText = nextStopName + ' ';
+            const nextStopPlatform = document.createElement('small');
+            nextStopPlatform.innerText = `#${train.stops[nextStopIdx].platform}`;
+            nextStop.appendChild(nextStopPlatform);
+        } else {
+            nextStop.innerText = '(outgoing)';
+        }
         to.appendChild(nextStop);
 
         if (nextStopIdx < train.stops.length - 1) {
