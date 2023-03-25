@@ -1,0 +1,33 @@
+
+<!-- Dispatch Helper - Copyright (c) 2023 Discookie. Released under the BSD 3-clause license.
+     https://github.com/Discookie/dispatch-helper -->
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Dispatch Helper</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <meta property="og:title" content="Dispatch Helper">
+        <meta property="og:url" content="https://dispatch.thewolf.sh">
+        <meta property="og:description" content="A timetable viewer and dispatch tracking system for the game Rail Route.">
+        <meta property="og:site_name" content="The Wolf">
+
+        <link rel="stylesheet" href="timetable.css">
+        <script type="module" src="timetable.js" ></script>
+    </head>
+    <body>
+        <noscript>
+            <p>We cannot process the timetable without Javascript, please enable it to continue.<br>
+            We do not collect any personal data - read the .js yourself if you want to be sure, it's not obfuscated!</p>
+        </noscript>
+        <script type="module">
+            import * as timetable from './timetable.js';
+
+            window.timetable = timetable;
+            const { initialSetup } = timetable;
+
+            initialSetup();
+        </script>
+    </body>
+</html>
