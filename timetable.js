@@ -11,11 +11,11 @@ export let levelContent;
 
 export let levelLoaded = false;
 export let displayedStations = [];
-export let stationData = {};
 export let globalTime = new Date(0);
 
 let intervalId;
 let lastTick = true;
+let updateCounter = 0;
 
 // TODO: Separate savestates for each map
 const autoLoad = () => window.localStorage.getItem('autoLoad') === 'true' ?? false;
@@ -27,6 +27,10 @@ const setPaused = (paused) => window.localStorage.setItem('paused', paused);
 
 const syncTime = () => autoLoad() ? new Date(+(window.localStorage.getItem('syncTime') ?? globalTime.getTime())) : globalTime;
 const setSyncTime = (syncTime) => window.localStorage.setItem('syncTime', syncTime.getTime());
+
+let localStationData = {};
+const getStationData = () => autoLoad() ? JSON.parse(window.localStorage.getItem('stationData') ?? '{}') : localStationData;
+const setStationData = (stationData) => window.localStorage.setItem('stationData', JSON.stringify(stationData));
 
 export function initialSetup() {
     document.body.innerHTML = '';
@@ -231,6 +235,7 @@ export function initialSetup() {
             const station = document.querySelector('#station-list').value;
             if (displayedStations.includes(station)) return;
             displayedStations.push(station);
+            window.location.hash = displayedStations.join(',');
             initStations(displayedStations);
         });
         selectStationsDiv.appendChild(addStationButton);
@@ -240,6 +245,7 @@ export function initialSetup() {
         removeStationButton.addEventListener('click', () => {
             const station = document.querySelector('#station-list').value;
             displayedStations = displayedStations.filter((e) => e !== station);
+            window.location.hash = displayedStations.join(',');
             initStations(displayedStations);
         });
         selectStationsDiv.appendChild(removeStationButton);
@@ -469,6 +475,12 @@ export function initialSetup() {
         const save = localStorage.getItem('save');
         if (save) {
             processInputs(save, false);
+            const stationsToLoad = window.location.hash.slice(1).split(',');
+            if (stationsToLoad.length > 0 && stationsToLoad[0] !== '') {
+                stationsConfigDiv.classList.add('hidden');
+                displayedStations = stationsToLoad;
+                initStations(displayedStations);
+            }
         }
     }
 }
@@ -575,7 +587,6 @@ export function processInputs(raw, shouldSync = true) {
     }
 
     displayedStations = [];
-    stationData = {};
     setLoadedState(true);
 
     setPaused(true);
@@ -589,6 +600,7 @@ export function processInputs(raw, shouldSync = true) {
 
     if (shouldSync) {
         setSyncTime(globalTime);
+        setStationData({});
     }
 
     const stationSelectDiv = document.querySelector('#station-select');
@@ -625,14 +637,6 @@ export function initStations(stations) {
         
         const stationName = document.createElement('h2');
         stationName.innerText = station.name;
-
-        const scrollToFill = document.createElement('small');
-        const scrollToFillInner = document.createElement('a');
-        scrollToFillInner.innerText = '#';
-        scrollToFillInner.href = `#station-${station.uuid}`;
-        scrollToFill.appendChild(scrollToFillInner);
-        stationName.appendChild(scrollToFill);
-
         stationDiv.appendChild(stationName);
 
         {
@@ -712,6 +716,8 @@ export function updateTimetable(stationID, forceUpdate = true) {
     }
 
     const timetableElement = stationDiv.querySelector('.timetable table');
+
+    const stationData = getStationData();
 
     if (!stationData[stationID]) {
         stationData[stationID] = {
@@ -872,7 +878,9 @@ export function updateTimetable(stationID, forceUpdate = true) {
         arrivalConfirmed.checked = !!stationData[station.uuid].trains[id].arrived;
         arrivalConfirmed.addEventListener('change', (e) => {
             // TODO: Place timestamp in train data
-            stationData[station.uuid].trains[id].arrived = e.target.checked ? globalTime : false;
+            const stationData = getStationData();
+            stationData[station.uuid].trains[id].arrived = e.target.checked ? globalTime.getTime() : false;
+            setStationData(stationData);
             updateTimetable(station.uuid)
         });
         arrivalTime.appendChild(arrivalConfirmed);
@@ -946,7 +954,9 @@ export function updateTimetable(stationID, forceUpdate = true) {
             departureConfirmed.type = 'checkbox';
             departureConfirmed.checked = !!stationData[station.uuid].trains[id].departed;
             departureConfirmed.addEventListener('change', (e) => {
-                stationData[station.uuid].trains[id].departed = e.target.checked ? globalTime : false;
+                const stationData = getStationData();
+                stationData[station.uuid].trains[id].departed = e.target.checked ? globalTime.getTime() : false;
+                setStationData(stationData);
                 updateTimetable(station.uuid)
             });
             departureTime.appendChild(departureConfirmed);
@@ -1009,13 +1019,21 @@ export function updateTimetable(stationID, forceUpdate = true) {
     }
 
     for (const [id, train] of trains) {
-
         addTrain(id, train);
     }
+
+    setStationData(stationData);
 }
 
 export function resetTimetable() {
-    stationData = {};
+    setStationData({});
+    setPaused(true);
+
+    const initialTimestamp = Math.min(...Object.values(timetable).map((e) => e.stops[0].arrival.getTime())) - 60000;
+    globalTime = new Date(initialTimestamp);
+
+    setSyncTime(globalTime);
+    lastTick = true;
 }
 
 export function parseTime(timeString) {
@@ -1028,32 +1046,44 @@ export function parseTime(timeString) {
 }
 
 export function displayTime(time, precision = 'minutes') {
+    if (typeof time === 'number') {
+        time = new Date(time);
+    }
     return time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: precision === 'seconds' ? '2-digit' : undefined, timeZone: 'UTC' });
 }
 
 export function tick() {
+    updateCounter = (updateCounter + 1) % 4;
+        
+
     if (!isPaused()) {
-        const lastTickMinutes = globalTime?.getUTCMinutes();
+        const lastTickSeconds = globalTime?.getUTCSeconds();
 
         const time = Date.now();
-        const difference = lastTick ? time - lastTick : 0;
+        const difference = typeof lastTick === 'number' ? time - lastTick : 0;
         lastTick = time;
         globalTime = new Date(globalTime.getTime() + difference);
 
-        const currentTickMinutes = globalTime.getUTCMinutes();
+        const currentTickSeconds = globalTime.getUTCSeconds();
 
-        for (const [stationUuid, _station] of Object.entries(stationData)) {
-            updateTimetable(stationUuid, currentTickMinutes !== lastTickMinutes);
+        for (const [stationUuid, _station] of Object.entries(getStationData())) {
+            updateTimetable(stationUuid, currentTickSeconds !== lastTickSeconds);
         }
-    } else if (!lastTick && globalTime.getTime() === syncTime().getTime()) {
-        return;
     } else {
+        if (updateCounter === 0) {
+            lastTick = true;
+        }
+
+        if (!lastTick && globalTime.getTime() === syncTime().getTime()) {
+            return;
+        }
+
         globalTime = syncTime();
 
         if (lastTick) {
             lastTick = undefined;
 
-            for (const [stationUuid, _station] of Object.entries(stationData)) {
+            for (const [stationUuid, _station] of Object.entries(getStationData())) {
                 updateTimetable(stationUuid, true);
             }
         }
